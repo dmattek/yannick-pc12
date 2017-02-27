@@ -1,6 +1,14 @@
 require(data.table)
 require(ggplot2)
 
+# definition of custom colour palette
+rhg_cols <- c("#771C19","#AA3929","#E25033","#F27314","#F8A31B",
+              "#E2C59F","#B6C5CC","#8E9CA3","#556670","#000000")
+
+md_cols <- c("#FFFFFF",
+             "#F8A31B","#F27314",  "#E25033",  "#AA3929",
+             "#FFFFCC", "#C2E699", "#78C679", "#238443")
+
 myCheckDigits <- function(x){ grepl('^[-]?[0-9]+[.]?[0-9]*$' , x) }
 
 myCheckLogical <- function(x){ grepl('^TRUE$|^FALSE$' , x) }
@@ -54,17 +62,25 @@ myTrajExtr = function(in.dt,
   
   # With cells selected above,
   # select tcourses with at most 1 break.
+  ## Single-breaks usually result from a single frame with lost focus
+  ## no interpolation
   # Calculation based on differences between consecutive Metadata_T.
   # Metadata_T increases by 1, thus a single-frame break would result in a difference of 2.
-  
+
+  # select cells recorded at the beginning and end of the experiment
   loc.dt.tmp2 = loc.dt.nuc.aggr[TrackObjects_Label_uni %in% loc.dt.tmp1$TrackObjects_Label_uni]
-  loc.dt.tmp2[, Metadata_T.diff := c(NA, diff(get(in.met.t))), by = TrackObjects_Label_uni]
-  loc.dt.tmp2 = loc.dt.tmp2[Metadata_T.diff <= in.max.break + 1]
   
-  # Selected trajectories with at most 1-frame break
-  loc.out = loc.dt.nuc.aggr[TrackObjects_Label_uni %in% loc.dt.tmp2$TrackObjects_Label_uni]
+  # calculate difference in consecutive time
+  loc.dt.tmp2[, Metadata_T.diff := c(NA, diff(get(in.met.t))), by = TrackObjects_Label_uni]
+  
+  # identify cells with at least one break longer than 1 frame
+  loc.dt.tmp2 = loc.dt.tmp2[Metadata_T.diff > 1 + in.max.break, .(Ncells = .N), by = TrackObjects_Label_uni]
+  
+  # Selected trajectories with frames at 1st and last time points AND with at most 1-frame break
+  loc.out = loc.dt.nuc.aggr[TrackObjects_Label_uni %in% setdiff(loc.dt.tmp1$TrackObjects_Label_uni, loc.dt.tmp2$TrackObjects_Label_uni)]
   return(loc.out)
 }
+
 
 
 # Returns original dt with an additional column with normalized quantity

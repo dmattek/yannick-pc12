@@ -4,23 +4,15 @@
 
 # Execute in a directory where output.mer is located
 
-source(pipe(paste("wget -O -", "https://www.dropbox.com/s/wmqwvj5y9xcdy86/comp_extractTraj_forND2_auxFn.R?dl=0")))
-
 # loads required libraries
-require(data.table)
-require(dplyr)
-require(ggplot2)
 require(xlsx)
 require(gridExtra)
 require(Hmisc) # for smean.cl.boot
+require(RCurl)
 
-# definition of custom colour palette
-rhg_cols <- c("#771C19","#AA3929","#E25033","#F27314","#F8A31B",
-              "#E2C59F","#B6C5CC","#8E9CA3","#556670","#000000")
 
-md_cols <- c("#FFFFFF",
-             "#F8A31B","#F27314",  "#E25033",  "#AA3929",
-             "#FFFFCC", "#C2E699", "#78C679", "#238443")
+auxScript = getURL("https://raw.githubusercontent.com/dmattek/yannick-pc12/master/comp_extractTraj_forND2_auxFn.R", ssl.verifypeer = FALSE)
+eval(parse(text = auxScript))
 
 
 ####
