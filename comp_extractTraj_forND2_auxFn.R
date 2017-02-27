@@ -64,7 +64,6 @@ myTrajExtr = function(in.dt,
   # for every Site at every time point: it takes the mean intensity of duplicated labels.
   # Make sure it makes sense!!!
   # Roughly 10% of objects affected
-  in.aggr.cols = c('Intensity_MeanIntensity_Ratio')
   
   if (!is.null(in.aggr.cols)) {
     loc.dt = loc.dt[, lapply(.SD, mean),
@@ -82,8 +81,6 @@ myTrajExtr = function(in.dt,
   
   # build vector with unique timepoints for the entire experiment
   loc.t.range = unique(loc.dt[, c(in.met.t), with = FALSE])
-  
-  loc.n.tp = max(loc.dt[, in.met.t, with = FALSE])
   
   # Select cells with number of timepoints equal to
   # the range nrow(loc.t.range)  AND

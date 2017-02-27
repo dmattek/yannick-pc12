@@ -143,7 +143,12 @@ dt.tass = data.table(Metadata_T = unique(dt.nuc[, get(s.met.time)]),
 
 ## Nuclei
 # obtain data table with cells with trajectories spanning entire experiment
-dt.nuc.sel = myTrajExtr(dt.nuc)
+dt.nuc.sel = myTrajExtr(in.dt = dt.nuc, 
+                        in.max.break = 1, 
+                        in.met.series = s.met.site, 
+                        in.met.t = s.met.time, 
+                        in.met.tracklabel = s.met.trackabel, 
+                        in.aggr.cols = 'Intensity_MeanIntensity_Ratio')
 
 # add real time column
 dt.nuc.sel = merge(dt.nuc.sel, dt.tass)
