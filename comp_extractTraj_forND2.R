@@ -127,10 +127,6 @@ if(length(s.exp.name) > 1)
   s.exp.name = s.exp.name[[1]]
 
 
-# Create directory for plots in the currenty working directory
-ifelse(!dir.exists(file.path(".", l.par$dir.plot)), dir.create(file.path(".", l.par$dir.plot)), FALSE)
-
-
 
 
 # Create a table with real time assigned to to Metadata_T
@@ -180,6 +176,15 @@ dt.im.mer.aggr = dt.im.mer[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.r
 # number of cells per site
 dt.ncells.persite = setorder(dt.nuc.sel[get(s.met.time) == 1, .N, by = Stim_All_S], Stim_All_S)
 dt.ncells.perch   = setorder(dt.nuc.sel[get(s.met.time) == 1, .N, by = Stim_All_Ch], Stim_All_Ch)
+
+
+# creating output in wide format for Jan
+l.nuc.sel.wide = lapply(split(dt.nuc.sel, by = 'Stim_All_Ch'), function(x)  {
+  dcast(data = x, formula = RealTime ~ TrackObjects_Label_uni, value.var = s.meas.nuc)
+})
+
+l.nuc.sel.wide.pulse = lapply(names(l.nuc.sel.wide), function(x) {loc.dt = merge(l.nuc.sel.wide[[x]], dt.im.mer.aggr[Stim_All_Ch %in% x, c('RealTime', 'mean.pulse.resc'), with = FALSE], by = 'RealTime')})
+names(l.nuc.sel.wide.pulse) = names(l.nuc.sel.wide)
 
 
 #####
@@ -282,7 +287,11 @@ p.out$imRatio_wDextrin_rZscore_perCh = myGgplotTraj(dt.arg = dt.nuc.sel.norm, x.
 #####
 ## Save o files
 if (l.par$plot.save) {
-  # all plots
+  
+  # Create directory for plots in the currenty working directory
+  ifelse(!dir.exists(file.path(".", l.par$dir.plot)), dir.create(file.path(".", l.par$dir.plot)), FALSE)
+  
+    # all plots
   lapply(names(p.out),
          function(x)
            ggsave(
@@ -304,5 +313,16 @@ if (l.par$plot.save) {
       width = 10)
   grid.table(dt.ncells.perch)
   dev.off()
+  
+  
+  # Create directory for outputs in wide format
+  ifelse(!dir.exists(file.path(".", 'data.wide')), dir.create(file.path(".", 'data.wide')), FALSE)
+  lapply(names(l.nuc.sel.wide.pulse), function(x) write.csv(l.nuc.sel.wide.pulse[[x]], file = paste0('data.wide/', gsub(' ', '_', gsub(':|\'|/', '', x)), ".csv"), row.names = FALSE) )
+
+  # Create directory for outputs in long format
+  ifelse(!dir.exists(file.path(".", 'data.long')), dir.create(file.path(".", 'data.long')), FALSE)
+  write.csv(dt.nuc.sel, 'data.long/tCoursesSelected.csv', row.names = FALSE)
+  write.csv(dt.im.mer, 'data.long/stimPulses.csv', row.names = FALSE)
+  
 }
 

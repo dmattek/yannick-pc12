@@ -66,7 +66,7 @@ myTrajExtr = function(in.dt,
   # Roughly 10% of objects affected
   
   if (!is.null(in.aggr.cols)) {
-    loc.dt = loc.dt[, lapply(.SD, mean),
+    loc.dt = loc.dt[, lapply(.SD, function(x) mean(x, na.rm = TRUE)),
                     by = c(in.met.series, in.met.t, in.met.tracklabel), .SDcols = in.aggr.cols]
   }
   
@@ -146,23 +146,23 @@ myNorm = function(in.dt,
   if (is.null(in.by.cols)) {
     if (in.robust)
       loc.dt.pre.aggr = loc.dt[get(in.rt.col) > in.rt.min &
-                                 get(in.rt.col) < in.rt.max, .(meas.md = median(get(in.meas.col)),
-                                                               meas.mad = mad(get(in.meas.col)))]
+                                 get(in.rt.col) < in.rt.max, .(meas.md = median(get(in.meas.col), na.rm = TRUE),
+                                                               meas.mad = mad(get(in.meas.col), na.rm = TRUE))]
     else
       loc.dt.pre.aggr = loc.dt[get(in.rt.col) > in.rt.min &
-                                 get(in.rt.col) < in.rt.max, .(meas.md = mean(get(in.meas.col)),
-                                                               meas.mad = sd(get(in.meas.col)))]
+                                 get(in.rt.col) < in.rt.max, .(meas.md = mean(get(in.meas.col), na.rm = TRUE),
+                                                               meas.mad = sd(get(in.meas.col), na.rm = TRUE))]
     
     loc.dt = cbind(loc.dt, loc.dt.pre.aggr)
   }  else {
     if (in.robust)
       loc.dt.pre.aggr = loc.dt[get(in.rt.col) > in.rt.min &
-                                 get(in.rt.col) < in.rt.max, .(meas.md = median(get(in.meas.col)),
-                                                               meas.mad = mad(get(in.meas.col))), by = in.by.cols]
+                                 get(in.rt.col) < in.rt.max, .(meas.md = median(get(in.meas.col), na.rm = TRUE),
+                                                               meas.mad = mad(get(in.meas.col), na.rm = TRUE)), by = in.by.cols]
     else
       loc.dt.pre.aggr = loc.dt[get(in.rt.col) > in.rt.min &
-                                 get(in.rt.col) < in.rt.max, .(meas.md = mean(get(in.meas.col)),
-                                                               meas.mad = sd(get(in.meas.col))), by = in.by.cols]
+                                 get(in.rt.col) < in.rt.max, .(meas.md = mean(get(in.meas.col), na.rm = TRUE),
+                                                               meas.mad = sd(get(in.meas.col), na.rm = TRUE)), by = in.by.cols]
     
     loc.dt = merge(loc.dt, loc.dt.pre.aggr, by = in.by.cols)
   }
