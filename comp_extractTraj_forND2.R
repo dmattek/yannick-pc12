@@ -31,6 +31,7 @@ df.par = read.xlsx(
   sheetIndex = 1,
   header = FALSE,
   as.data.frame = TRUE,
+  colIndex = 1:2,
   colClasses = rep("character", 2),
   stringsAsFactors = FALSE
 )
