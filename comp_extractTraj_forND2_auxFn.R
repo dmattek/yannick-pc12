@@ -48,6 +48,36 @@ myConvertStringListToTypes <- function(in.l) {
   return(in.l)
 }
 
+# f-n to read experimental description
+myExpRead = function(inFname, inCleanRowCol = TRUE, inCleanMissing = TRUE, inStartRow = 1, inSheetName = 1, inRowIndex = NULL) {
+  # read the file
+  loc.dt.exp = as.data.table(read.xlsx(
+    file = inFname,
+    sheetName = inSheetName,
+    rowIndex = inRowIndex,
+    startRow = inStartRow
+  ))
+  
+  if(inCleanRowCol) {
+    # sometimes an NA column appears at the end; remove
+    loc.dt.exp = loc.dt.exp[, names(loc.dt.exp)[!(names(loc.dt.exp) %like% 'NA')], with = FALSE]
+    
+    # sometimes an NA row appears at the end; remove
+    loc.dt.exp = loc.dt.exp[loc.dt.exp[,!Reduce(`&`, lapply(.SD, is.na))]]
+  }
+  
+  if(inCleanMissing) {
+    # replace missing values with ''
+    for (i in seq_along(loc.dt.exp))
+      set(loc.dt.exp,
+          i = which(is.na(loc.dt.exp[[i]])),
+          j = i,
+          value = '')
+  }
+  
+  return(loc.dt.exp)
+}
+
 
 # Returns dt with trajectories that last from the first till last frame
 # and include at most in.max.break interruptions
@@ -89,8 +119,8 @@ myTrajExtr = function(in.dt,
   # tracks with forks will be omitted here because the number of timepoints exceeds nrow(loc.t.range)
   loc.dt.tmp1 = loc.dt[, .(
     Ntpt = .N,
-    T.start = first(Metadata_T),
-    T.end = last(Metadata_T)
+    T.start = first(get(in.met.t)),
+    T.end = last(get(in.met.t))
   ),
   by = TrackObjects_Label_uni][Ntpt <=  nrow(loc.t.range) &
                                  T.start == min(loc.t.range) &
@@ -122,15 +152,15 @@ myTrajExtr = function(in.dt,
   return(loc.out)
 }
 
-# Returns original dt with an additional column with normalized quantity
-# the column to be normalised is given by 'in.meas.col'
+# Returns original dt with an additional column with normalized quantity.
+# The column to be normalised is given by 'in.meas.col'.
 # Normalisation is based on part of the trajectory;
-# this is defined by in.rt.in and max, and the column with time in.rt.col.
+# this is defined by in.rt.min and max, and the column with time in.rt.col.
 # Additional parameters:
 # in.by.cols - character vector with 'by' columns to calculate normalisation per group
 #              if NULL, no grouping is done
 # in.robust - whether robust measures should be used (median instead of mean, mad instead of sd)
-# in.type - type of normalization: z.score or mean (fold change w.r.t. mean)
+# in.type - type of normalization: z.score or mean (fi.e. old change w.r.t. mean)
 
 myNorm = function(in.dt,
                   in.meas.col,
@@ -306,6 +336,9 @@ myGgplotTrajRibbon = function(dt.arg,
                               x.arg,
                               y.arg,
                               group.arg,
+                              dt.stim.arg = NULL,
+                              stim.x.arg,
+                              stim.y.arg,
                               xlab.arg = "Time",
                               ylab.arg = "Fl. int.",
                               plotlab.arg = "") {
@@ -313,8 +346,21 @@ myGgplotTrajRibbon = function(dt.arg,
     geom_ribbon(aes(ymin = Lower, ymax = Upper),
                 fill = 'grey70',
                 alpha = 0.5) +
-    geom_line(aes_string(y = y.arg, colour = group.arg)) +
-    scale_color_manual(values = rhg_cols, name = "") +
+    geom_line(aes_string(y = y.arg, colour = group.arg))
+    
+    
+    if (!is.null(dt.stim.arg)) {
+      p.tmp = p.tmp + geom_line(
+        data = dt.stim.arg,
+        aes_string(x = stim.x.arg, y = stim.y.arg),
+        colour = 'blue',
+        size = 1,
+        group = 1
+      )
+    }
+  
+  p.tmp = p.tmp + 
+    scale_color_discrete(name = "") +
     xlab(paste0(xlab.arg, "\n")) +
     ylab(paste0("\n", ylab.arg)) +
     ggtitle(plotlab.arg) +

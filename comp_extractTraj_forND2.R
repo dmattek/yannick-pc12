@@ -71,9 +71,6 @@ c.n.SperCh = length(unique((dt.exp$Position))) / c.n.devch
 # Used to assign real time
 c.acq.freq =  median(dt.exp$Acquisition_frequency_min)
 
-# Time before which a 5-time point average is calculated for normalization of time courses
-c.t.norm = median(dt.exp$Equilibration_min)
-
 
 
 ####
@@ -129,6 +126,9 @@ if(length(s.exp.name) > 1)
 
 
 
+# trim original dt according to max realtime val given in plotFormat file
+dt.nuc = dt.nuc[get(s.met.time) <= round(l.par$rt.max / c.acq.freq)]
+
 
 # Create a table with real time assigned to to Metadata_T
 # Assumption: frequency of data acquisition = c.acq.freq
@@ -136,7 +136,6 @@ if(length(s.exp.name) > 1)
 
 dt.tass = data.table(Metadata_T = unique(dt.nuc[, get(s.met.time)]), 
                      RealTime = seq(0, max(dt.nuc[, get(s.met.time)])*c.acq.freq, c.acq.freq))
-
 
 ## Nuclei
 # obtain data table with cells with trajectories spanning entire experiment
@@ -162,7 +161,7 @@ dt.im.mer = merge(dt.im, dt.tass, by = s.met.time)
 dt.im.mer = merge(dt.im.mer, dt.exp[, .(Position, Stim_All_Ch, Stim_All_S)], by.x = s.met.site, by.y = 'Position')
 
 ## Rescale pulse channel between c.plot.y.min & c.plot.y.max
-dt.im.mer = myResc(
+dt.im.mer.resc = myResc(
   in.dt = dt.im.mer,
   in.meas.col = s.meas.img,
   in.y.min = as.numeric(l.par$plot.y.min),
@@ -171,7 +170,7 @@ dt.im.mer = myResc(
 
 
 # create pulse averages per channel
-dt.im.mer.aggr = dt.im.mer[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(Stim_All_Ch, RealTime)]
+dt.im.mer.resc.aggr = dt.im.mer.resc[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(Stim_All_Ch, RealTime)]
 
 
 # number of cells per site
@@ -184,7 +183,8 @@ l.nuc.sel.wide = lapply(split(dt.nuc.sel, by = 'Stim_All_Ch'), function(x)  {
   dcast(data = x, formula = RealTime ~ TrackObjects_Label_uni, value.var = s.meas.nuc)
 })
 
-l.nuc.sel.wide.pulse = lapply(names(l.nuc.sel.wide), function(x) {loc.dt = merge(l.nuc.sel.wide[[x]], dt.im.mer.aggr[Stim_All_Ch %in% x, c('RealTime', 'mean.pulse.resc'), with = FALSE], by = 'RealTime')})
+l.nuc.sel.wide.pulse = lapply(names(l.nuc.sel.wide), 
+                              function(x) {loc.dt = merge(l.nuc.sel.wide[[x]], dt.im.mer.resc.aggr[Stim_All_Ch %in% x, c('RealTime', 'mean.pulse.resc'), with = FALSE], by = 'RealTime')})
 names(l.nuc.sel.wide.pulse) = names(l.nuc.sel.wide)
 
 
@@ -216,7 +216,7 @@ p.out = list()
 
 # Plot: raw trajectories per site with dextrin
 p.out$imRatio_wDextrin_notNorm_perSite = myGgplotTraj(dt.arg = dt.nuc.sel, x.arg = 'RealTime', y.arg = s.meas.nuc, group.arg = paste0(s.met.trackabel, '_uni'), 
-                                                      dt.stim.arg = dt.im.mer, stim.x.arg = 'RealTime', stim.y.arg = paste0(s.meas.img, '.resc'),
+                                                      dt.stim.arg = dt.im.mer.resc, stim.x.arg = 'RealTime', stim.y.arg = paste0(s.meas.img, '.resc'),
                                                       ylim.arg = c(l.par$plot.y.min - l.par$plot.stim.y.height, l.par$plot.y.max), 
                                                       xaxisbreaks.arg = l.par$plot.x.interv,
                                                       maxrt.arg =  max(dt.tass$RealTime), 
@@ -229,7 +229,7 @@ p.out$imRatio_wDextrin_notNorm_perSite = myGgplotTraj(dt.arg = dt.nuc.sel, x.arg
 
 # Plot: raw trajectories with dextrin per channel
 p.out$imRatio_wDextrin_notNorm_perCh = myGgplotTraj(dt.arg = dt.nuc.sel, x.arg = 'RealTime', y.arg = s.meas.nuc, group.arg = paste0(s.met.trackabel, '_uni'), 
-                                                    dt.stim.arg = dt.im.mer.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
+                                                    dt.stim.arg = dt.im.mer.resc.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
                                                     ylim.arg = c(l.par$plot.y.min - l.par$plot.stim.y.height, l.par$plot.y.max), 
                                                     xaxisbreaks.arg = l.par$plot.x.interv, 
                                                     maxrt.arg =  max(dt.tass$RealTime), 
@@ -245,48 +245,82 @@ p.out$imRatio_wDextrin_notNorm_perCh = myGgplotTraj(dt.arg = dt.nuc.sel, x.arg =
 
 
 ## Population averages per channel
+# confidence intervals for population averages are calculated using bootstrapping method with 1000 iterations
 dt.nuc.sel.mean = dt.nuc.sel[, as.list(smean.cl.boot(get(s.meas.nuc), B = 1000)), by = .(Stim_All_Ch, RealTime)]
+
+# calculate dextrin mean from all channels
+# create pulse averages per channel
+dt.im.mer.resc.aggr = dt.im.mer.resc[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(RealTime)]
+
+
 
 p.out$imRatio_popMeanCI_notNorm_perCh = myGgplotTrajRibbon(dt.nuc.sel.mean, 
                    x.arg = "RealTime", 
                    y.arg = "Mean", 
                    group.arg = "Stim_All_Ch", 
+                   dt.stim.arg = dt.im.mer.resc.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
                    xlab.arg = "\nTime [min]",
                    ylab.arg = "Mean\n",
                    plotlab.arg = paste0('Experiment: ', s.exp.name))
 
 
-## Normalization
+
+## Normalization per channel: fold change
 dt.nuc.sel.norm = myNorm(in.dt = dt.nuc.sel, 
                          in.meas.col = 'Intensity_MeanIntensity_Ratio', 
                          in.rt.min = l.par$plot.norm.skip,
-                         in.rt.max = c.t.norm, 
-                         in.type = 'z.score')
+                         in.rt.max = l.par$plot.norm.max, 
+                         in.by.cols = 'Stim_All_Ch',
+                         in.type = 'mean')
 
+## Plot: individual trajectories with the mean - facet per channel
 # rescale dextrin again according to new normalization
-dt.im.mer = myResc(
+dt.im.mer.resc = myResc(
   in.dt = dt.im.mer,
   in.meas.col = s.meas.img,
-  in.y.min = -5,
-  in.y.h = 4
+  in.y.min = 0.8,
+  in.y.h = 0.1
 )
 
 # create pulse averages per channel
-dt.im.mer.aggr = dt.im.mer[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(Stim_All_Ch, RealTime)]
+dt.im.mer.resc.aggr = dt.im.mer.resc[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(Stim_All_Ch, RealTime)]
 
-
-p.out$imRatio_wDextrin_rZscore_perCh = myGgplotTraj(dt.arg = dt.nuc.sel.norm, x.arg = 'RealTime', y.arg = 'meas.norm', group.arg = paste0(s.met.trackabel, '_uni'), 
-                                                    dt.stim.arg = dt.im.mer.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
+p.out$imRatio_wDextrin_foldCh_perCh = myGgplotTraj(dt.arg = dt.nuc.sel.norm, x.arg = 'RealTime', y.arg = 'meas.norm', group.arg = paste0(s.met.trackabel, '_uni'), 
+                                                    dt.stim.arg = dt.im.mer.resc.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
                                                     xaxisbreaks.arg = l.par$plot.x.interv, 
                                                     maxrt.arg =  max(dt.tass$RealTime), 
                                                     summary.arg = TRUE,
                                                     facet.arg = 'Stim_All_Ch', facet.ncol.arg = l.par$plot.facets.ncol.channel, 
-                                                    xlab.arg = "\nTime [min]", ylab.arg = "rZ-score (from Illum.Corr)\n", plotlab.arg = paste0('Experiment: ', s.exp.name))
+                                                    xlab.arg = "\nTime [min]", ylab.arg = "Fold change (each channel norm\'d separately)\n", plotlab.arg = paste0('Experiment: ', s.exp.name))
 
 
+
+## Plot: channel averages with CI in one facet; normalized - fold change separately for every channel
+# confidence intervals for population averages are calculated using bootstrapping method with 1000 iterations
+dt.nuc.sel.norm.mean = dt.nuc.sel.norm[, as.list(smean.cl.boot(meas.norm, B = 1000)), by = .(Stim_All_Ch, RealTime)]
+
+## Rescale pulse channel between c.plot.y.min & c.plot.y.max
+dt.im.mer.resc = myResc(
+  in.dt = dt.im.mer,
+  in.meas.col = s.meas.img,
+  in.y.min = 0.95,
+  in.y.h = 0.05
+)
+
+# calculate dextrin mean from all channels
+dt.im.mer.resc.aggr = dt.im.mer.resc[, .(mean.pulse.resc = mean(get(paste0(s.meas.img, '.resc')))), by = .(RealTime)]
+
+p.out$imRatio_popMeanCI_foldCh_perCh = myGgplotTrajRibbon(dt.nuc.sel.norm.mean, 
+                                                           x.arg = "RealTime", 
+                                                           y.arg = "Mean", 
+                                                           group.arg = "Stim_All_Ch", 
+                                                           dt.stim.arg = dt.im.mer.resc.aggr, stim.x.arg = 'RealTime', stim.y.arg = 'mean.pulse.resc',
+                                                           xlab.arg = "\nTime [min]",
+                                                           ylab.arg = "Fold change (each channel norm\'d separately)\n",
+                                                           plotlab.arg = paste0('Experiment: ', s.exp.name))
 
 #####
-## Save o files
+## Save files
 if (l.par$plot.save) {
   
   # Create directory for plots in the currenty working directory
